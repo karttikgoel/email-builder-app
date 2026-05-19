@@ -632,8 +632,8 @@
           label: 'Highlight Box (Green List)', 
           inputType: 'list', 
           html: '<div style="background-color: #f2fbf5; border-radius: 8px; padding: 25px 20px; font-family: Helvetica, Arial, sans-serif; text-align: {{align}}; margin: 10px 0;"><table border="0" cellpadding="0" cellspacing="0" width="100%">{{items}}</table></div>',
-          itemHtml: '<tr><td valign="top" style="width: 24px; color: #166534; font-weight: 300; font-size: 24px; line-height: 20px; padding-top: 2px;">+</td><td valign="top" style="padding-bottom: 10px;"><strong style="color: #166534; font-size: 15px; display: block; margin-bottom: 4px;">{{item_title}}</strong><span style="color: #5f5e5a; font-size: 14px; line-height: 1.5;">{{item_desc}}</span></td></tr>',
-          defaultContent: '[{"title":"Highlight Title 1", "desc":"Short description for the highlight goes here."}, {"title":"Highlight Title 2", "desc":"Another short description goes here."}]'
+          itemHtml: '<tr><td valign="top" style="width: 24px; color: #166534; font-weight: 300; font-size: 24px; line-height: 20px; padding: 12px 8px 12px 0;">+</td><td valign="top" style="padding: 12px 16px 12px 5px; border-bottom: 1px solid #d1fae5;"><strong style="color: #000000; font-size: 14px; font-weight: bold; display: block; margin-bottom: 2px; line-height: 1.3;">{{item_title}}</strong><span style="color: #5f5e5a; font-size: 13px; line-height: 1.4;">{{item_desc}}</span></td></tr>',
+          defaultContent: '[{"title":"Highlight Title 1", "desc":"Short description for the highlight goes here.", "linkText":"", "linkUrl":""}, {"title":"Highlight Title 2", "desc":"Another short description goes here.", "linkText":"", "linkUrl":""}]'
         },
         { 
           id: 'numbered_steps', 
@@ -659,7 +659,9 @@
         },
         { id: 'image', label: 'Hero Banner / Image', inputType: 'image', html: '<img src="{{content}}" alt="{{meta}}" style="max-width:100%; height:auto; display:block; border:0; margin: 10px auto;" />' },
         { id: 'button', label: 'Primary Button', inputType: 'button', html: '<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin: 15px 0;"><tr><td align="{{align}}"><a href="{{meta}}" style="display:inline-block; padding:14px 28px; background-color:#fce300; color:#000000; text-decoration:none; border-radius:4px; font-weight:bold; font-family: Helvetica, Arial, sans-serif; font-size: 16px;">{{content}}</a></td></tr></table>' },
-        { id: 'divider', label: 'Divider Line', inputType: 'divider', html: '<hr style="border:none; border-top:1px solid #eeeeee; margin: 15px 0;" />' }
+        { id: 'divider', label: 'Divider Line', inputType: 'divider', html: '<hr style="border:none; border-top:1px solid #eeeeee; margin: 15px 0;" />' },
+        { id: 'table', label: 'Data Table', inputType: 'table', html: '{{content}}', defaultContent: '{"headers":["Column 1","Column 2","Column 3"],"rows":[["","",""],[""  ,"",""]]}', defaultContentAr: '{"headers":["العمود 1","العمود 2","العمود 3"],"rows":[["","",""],[""  ,"",""]]}' },
+        { id: 'custom_html', label: 'Custom HTML Block', inputType: 'custom_html', html: '{{content}}', defaultContent: '<!-- Paste your custom HTML here -->' }
     ];
 
     let GLOBAL_LAYOUT_CONFIG = {
@@ -1209,6 +1211,8 @@
                                 <option value="image" ${item.inputType === 'image' ? 'selected' : ''}>Image (URL + Alt)</option>
                                 <option value="button" ${item.inputType === 'button' ? 'selected' : ''}>Button (Text + URL)</option>
                                 <option value="divider" ${item.inputType === 'divider' ? 'selected' : ''}>Divider (No Input)</option>
+                                <option value="table" ${item.inputType === 'table' ? 'selected' : ''}>Data Table</option>
+                                <option value="custom_html" ${item.inputType === 'custom_html' ? 'selected' : ''}>Custom HTML Block</option>
                             </select>
                         </div>
                     </div>
@@ -1679,6 +1683,140 @@
         updateTemplate();
     };
 
+    // ============================================================================
+    // TABLE BLOCK EDITOR
+    // ============================================================================
+
+    function renderTableEditor(blockId, lang, valStr) {
+        let tableData = { headers: ['Column 1', 'Column 2'], rows: [['', ''], ['', '']] };
+        try { const parsed = JSON.parse(valStr); if (parsed && parsed.headers) tableData = parsed; } catch(e){}
+        const numCols = tableData.headers.length;
+
+        let headersHtml = tableData.headers.map((h, ci) => `
+            <th style="padding:4px; vertical-align:top; white-space:nowrap;">
+                <input type="text" class="table-header-cell" data-col="${ci}" value="${(h||'').replace(/"/g, '&quot;')}" placeholder="Header ${ci+1}"
+                    oninput="syncTableData('${blockId}','${lang}')"
+                    style="width:100%; min-width:80px; padding:8px 10px; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:12px; font-weight:700; background:var(--bg-hover); color:var(--text-main);" ${lang === 'ar' ? 'dir="rtl"' : ''}>
+            </th>`).join('');
+
+        let rowsHtml = tableData.rows.map((row, ri) => {
+            let cellsHtml = row.map((cell, ci) => `
+                <td style="padding:4px; vertical-align:top;">
+                    <input type="text" class="table-body-cell" data-row="${ri}" data-col="${ci}" value="${(cell||'').replace(/"/g, '&quot;')}" placeholder="Cell"
+                        oninput="syncTableData('${blockId}','${lang}')"
+                        style="width:100%; min-width:80px; padding:8px 10px; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:12px; background:var(--bg-hover); color:var(--text-main);" ${lang === 'ar' ? 'dir="rtl"' : ''}>
+                </td>`).join('');
+            return `<tr class="table-row-editor" data-row="${ri}">
+                ${cellsHtml}
+                <td style="padding:4px; width:26px; vertical-align:middle;">
+                    <button type="button" onclick="removeTableRow('${blockId}','${lang}',${ri})"
+                        style="padding:5px 7px; background:transparent; color:var(--text-danger); border:1px solid rgba(220,38,38,0.2); border-radius:var(--radius-sm); cursor:pointer; font-size:11px; line-height:1;" title="Remove Row">✕</button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        return `
+            <div id="table_editor_${blockId}_${lang}" class="table-editor-container" style="padding:16px;">
+                <div style="overflow-x:auto; margin-bottom:8px;">
+                    <table style="border-collapse:collapse; width:100%;" class="table-edit-grid">
+                        <thead>
+                            <tr>
+                                ${headersHtml}
+                                <th style="padding:4px; width:26px; vertical-align:middle;">
+                                    <button type="button" onclick="addTableColumn('${blockId}','${lang}')"
+                                        style="padding:4px 7px; background:transparent; color:var(--text-success); border:1px solid rgba(22,163,74,0.3); border-radius:var(--radius-sm); cursor:pointer; font-size:10px; font-weight:700; white-space:nowrap;" title="Add Column">+col</button>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button type="button" class="run-btn secondary" style="padding:7px 14px; font-size:12px; width:auto;" onclick="addTableRow('${blockId}','${lang}')">+ Add Row</button>
+                    <button type="button" class="run-btn secondary" style="padding:7px 14px; font-size:12px; width:auto; color:var(--text-danger);" onclick="removeTableColumn('${blockId}','${lang}')">− Remove Last Column</button>
+                </div>
+                <textarea id="in_${blockId}_${lang}" style="display:none;" oninput="updateTemplate()">${valStr}</textarea>
+            </div>`;
+    }
+
+    window.syncTableData = function(blockId, lang) {
+        const container = document.getElementById(`table_editor_${blockId}_${lang}`);
+        if (!container) return;
+        const grid = container.querySelector('.table-edit-grid');
+        if (!grid) return;
+        const headers = Array.from(grid.querySelectorAll('thead .table-header-cell')).map(i => i.value);
+        const rows = Array.from(grid.querySelectorAll('tbody .table-row-editor')).map(tr =>
+            Array.from(tr.querySelectorAll('.table-body-cell')).map(i => i.value)
+        );
+        const hidden = document.getElementById(`in_${blockId}_${lang}`);
+        if (hidden) hidden.value = JSON.stringify({ headers, rows });
+        updateTemplate();
+    };
+
+    window.addTableRow = function(blockId, lang) {
+        const container = document.getElementById(`table_editor_${blockId}_${lang}`);
+        if (!container) return;
+        const grid = container.querySelector('.table-edit-grid');
+        const numCols = grid.querySelectorAll('thead .table-header-cell').length;
+        const tbody = grid.querySelector('tbody');
+        const ri = tbody.querySelectorAll('.table-row-editor').length;
+        const tr = document.createElement('tr');
+        tr.className = 'table-row-editor';
+        tr.dataset.row = ri;
+        let cellsHtml = Array.from({length: numCols}, (_, ci) => `
+            <td style="padding:4px; vertical-align:top;">
+                <input type="text" class="table-body-cell" data-row="${ri}" data-col="${ci}" value="" placeholder="Cell"
+                    oninput="syncTableData('${blockId}','${lang}')"
+                    style="width:100%; min-width:80px; padding:8px 10px; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:12px; background:var(--bg-hover); color:var(--text-main);">
+            </td>`).join('');
+        tr.innerHTML = cellsHtml + `<td style="padding:4px; width:26px; vertical-align:middle;"><button type="button" onclick="removeTableRow('${blockId}','${lang}',${ri})" style="padding:5px 7px; background:transparent; color:var(--text-danger); border:1px solid rgba(220,38,38,0.2); border-radius:var(--radius-sm); cursor:pointer; font-size:11px; line-height:1;">✕</button></td>`;
+        tbody.appendChild(tr);
+        syncTableData(blockId, lang);
+    };
+
+    window.removeTableRow = function(blockId, lang, rowIndex) {
+        const container = document.getElementById(`table_editor_${blockId}_${lang}`);
+        if (!container) return;
+        const rows = container.querySelectorAll('.table-row-editor');
+        if (rows.length <= 1) { showToast("A table must have at least one row.", "error"); return; }
+        rows[rowIndex].remove();
+        syncTableData(blockId, lang);
+    };
+
+    window.addTableColumn = function(blockId, lang) {
+        const container = document.getElementById(`table_editor_${blockId}_${lang}`);
+        if (!container) return;
+        const grid = container.querySelector('.table-edit-grid');
+        const addColTh = grid.querySelector('thead tr th:last-child');
+        const numCols = grid.querySelectorAll('thead .table-header-cell').length;
+        const newTh = document.createElement('th');
+        newTh.style.cssText = 'padding:4px; vertical-align:top; white-space:nowrap;';
+        newTh.innerHTML = `<input type="text" class="table-header-cell" data-col="${numCols}" value="" placeholder="Header ${numCols+1}" oninput="syncTableData('${blockId}','${lang}')" style="width:100%; min-width:80px; padding:8px 10px; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:12px; font-weight:700; background:var(--bg-hover); color:var(--text-main);">`;
+        grid.querySelector('thead tr').insertBefore(newTh, addColTh);
+        grid.querySelectorAll('.table-row-editor').forEach((tr, ri) => {
+            const removeBtn = tr.querySelector('td:last-child');
+            const newTd = document.createElement('td');
+            newTd.style.cssText = 'padding:4px; vertical-align:top;';
+            newTd.innerHTML = `<input type="text" class="table-body-cell" data-row="${ri}" data-col="${numCols}" value="" placeholder="Cell" oninput="syncTableData('${blockId}','${lang}')" style="width:100%; min-width:80px; padding:8px 10px; border:1px solid var(--border-color); border-radius:var(--radius-sm); font-size:12px; background:var(--bg-hover); color:var(--text-main);">`;
+            tr.insertBefore(newTd, removeBtn);
+        });
+        syncTableData(blockId, lang);
+    };
+
+    window.removeTableColumn = function(blockId, lang) {
+        const container = document.getElementById(`table_editor_${blockId}_${lang}`);
+        if (!container) return;
+        const grid = container.querySelector('.table-edit-grid');
+        const headers = grid.querySelectorAll('thead .table-header-cell');
+        if (headers.length <= 1) { showToast("A table must have at least one column.", "error"); return; }
+        headers[headers.length - 1].closest('th').remove();
+        grid.querySelectorAll('.table-row-editor').forEach(tr => {
+            const cells = tr.querySelectorAll('.table-body-cell');
+            if (cells.length > 0) cells[cells.length - 1].closest('td').remove();
+        });
+        syncTableData(blockId, lang);
+    };
+
     function addEmailBlock(type, data = null, targetSibling = null) {
         const id = data && data.id ? data.id : generateId();
 
@@ -1751,6 +1889,12 @@
         } else if (conf.inputType === 'divider') {
             enInputHtml = `<div style="padding:15px; text-align:center; color:var(--text-muted); background:var(--bg-hover); border-radius:4px; font-size:12px;">➖ Divider Line</div>`;
             arInputHtml = `<div style="padding:15px; text-align:center; color:var(--text-muted); background:var(--bg-hover); border-radius:4px; font-size:12px;">➖ خط فاصل</div>`;
+        } else if (conf.inputType === 'table') {
+            enInputHtml = renderTableEditor(id, 'en', enVal || conf.defaultContent || '{"headers":["Column 1","Column 2"],"rows":[["",""]]}');
+            arInputHtml = renderTableEditor(id, 'ar', arVal || conf.defaultContentAr || conf.defaultContent || '{"headers":["العمود 1","العمود 2"],"rows":[["",""]]}');
+        } else if (conf.inputType === 'custom_html') {
+            enInputHtml = `<textarea id="in_${id}_en" placeholder="&lt;!-- Paste or write your custom HTML here... --&gt;" oninput="updateTemplate()" style="font-family:monospace; font-size:12px; line-height:1.6; min-height:160px; padding:16px; border:none; background:transparent; color:var(--text-main); width:100%; resize:vertical; outline:none; display:block;">${(enVal || conf.defaultContent || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>`;
+            arInputHtml = `<textarea id="in_${id}_ar" placeholder="&lt;!-- أدخل HTML المخصص هنا... --&gt;" oninput="updateTemplate()" dir="rtl" style="font-family:monospace; font-size:12px; line-height:1.6; min-height:160px; padding:16px; border:none; background:transparent; color:var(--text-main); width:100%; resize:vertical; outline:none; display:block;">${(arVal || conf.defaultContent || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>`;
         }
 
         const html = `
@@ -1962,6 +2106,28 @@
 
               enHtml = enItemsHtml ? conf.html.replace(/\{\{items\}\}/g, enItemsHtml).replace(/\{\{align\}\}/g, enAlign).replace(/\{\{meta\}\}/g, b.enMeta || '') : '';
               arHtml = arItemsHtml ? conf.html.replace(/\{\{items\}\}/g, arItemsHtml).replace(/\{\{align\}\}/g, arAlign).replace(/\{\{meta\}\}/g, b.arMeta || '') : '';
+          } else if (conf.inputType === 'table') {
+              const buildTableHtml = (jsonStr, align) => {
+                  let td;
+                  try { td = JSON.parse(jsonStr); } catch(e) { return ''; }
+                  if (!td || !td.headers || !td.rows) return '';
+                  const thHtml = td.headers.map(h =>
+                      `<th style="background-color:#f8f8f8; border:1px solid #e5e7eb; padding:10px 14px; text-align:${align}; font-weight:700; color:#1a1a1a; font-family:Helvetica,Arial,sans-serif; font-size:14px;">${h}</th>`
+                  ).join('');
+                  const tbodyHtml = td.rows.map((row, ri) => {
+                      const bg = ri % 2 === 0 ? '#ffffff' : '#fafafa';
+                      const tdHtml = row.map(cell =>
+                          `<td style="border:1px solid #e5e7eb; padding:10px 14px; color:#333333; vertical-align:top; font-family:Helvetica,Arial,sans-serif; font-size:14px; line-height:1.5; background-color:${bg};">${cell}</td>`
+                      ).join('');
+                      return `<tr>${tdHtml}</tr>`;
+                  }).join('');
+                  return `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse; margin:10px 0; width:100%;"><thead><tr>${thHtml}</tr></thead><tbody>${tbodyHtml}</tbody></table>`;
+              };
+              enHtml = b.en ? buildTableHtml(b.en, enAlign) : '';
+              arHtml = b.ar ? buildTableHtml(b.ar, arAlign) : '';
+          } else if (conf.inputType === 'custom_html') {
+              enHtml = b.en || '';
+              arHtml = b.ar || '';
           } else {
               if (b.en) enHtml = conf.html.replace(/\{\{content\}\}/g, b.en).replace(/\{\{meta\}\}/g, b.enMeta).replace(/\{\{align\}\}/g, enAlign);
               if (b.ar) arHtml = conf.html.replace(/\{\{content\}\}/g, b.ar).replace(/\{\{meta\}\}/g, b.arMeta).replace(/\{\{align\}\}/g, arAlign);
@@ -2107,7 +2273,7 @@ ${exportContent}
             const content = lang === 'en' ? b.en : b.ar;
             const meta = lang === 'en' ? b.enMeta : b.arMeta;
             const conf = BLOCKS_CONFIG.find(c => c.id === b.type);
-            if (!conf || conf.inputType === 'image' || conf.inputType === 'divider') return;
+            if (!conf || conf.inputType === 'image' || conf.inputType === 'divider' || conf.inputType === 'table' || conf.inputType === 'custom_html') return;
             
             if (conf.inputType === 'title_subtitle') {
                 xml += `  <block id="${b.id}" hasMeta="true">\n    <content>${content}</content>\n    <meta>${meta}</meta>\n  </block>\n`;
